@@ -23,11 +23,17 @@ export default function PdfUploader({ onTextExtracted, disabled }: PdfUploaderPr
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-
-      // Load PDF.js from CDN via dynamic import workaround
       setStatus("processing");
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+      // Load PDF.js from CDN directly — bypasses Turbopack bundling issues with browser-only APIs
+      // Using Function constructor to make the URL opaque to TypeScript and bundlers
+      const cdnImport = new Function("url", "return import(url)");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pdfjsLib: any = await cdnImport(
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.6.205/build/pdf.min.mjs"
+      );
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.6.205/build/pdf.worker.min.mjs";
 
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
@@ -42,7 +48,8 @@ export default function PdfUploader({ onTextExtracted, disabled }: PdfUploaderPr
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
         const pageText = content.items
-          .map((item) => ("str" in item ? item.str : ""))
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((item: any) => ("str" in item ? item.str : ""))
           .join(" ");
         fullText += pageText + "\n\n";
       }
@@ -55,8 +62,9 @@ export default function PdfUploader({ onTextExtracted, disabled }: PdfUploaderPr
 
       setStatus("idle");
       onTextExtracted(fullText, pdf.numPages);
-    } catch {
-      setError("PDF 처리 중 오류가 발생했습니다.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`PDF 처리 중 오류가 발생했습니다: ${msg}`);
       setStatus("idle");
     }
   }
