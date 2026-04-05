@@ -25,20 +25,15 @@ export default function PdfUploader({ onTextExtracted, disabled }: PdfUploaderPr
       const arrayBuffer = await file.arrayBuffer();
       setStatus("processing");
 
-      // Load PDF.js from CDN directly — bypasses Turbopack bundling issues with browser-only APIs
-      // Using Function constructor to make the URL opaque to TypeScript and bundlers
-      const cdnImport = new Function("url", "return import(url)");
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfjsLib: any = await cdnImport(
-        "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.6.205/build/pdf.min.mjs"
-      );
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdn.jsdelivr.net/npm/pdfjs-dist@5.6.205/build/pdf.worker.min.mjs";
+      // Dynamic import ensures pdfjs only runs in browser (never during SSR)
+      const pdfjsLib = await import("pdfjs-dist");
+      // Worker served from /public/ — same origin avoids CORS issues with module workers
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-      if (pdf.numPages > 5) {
-        setError("This demo supports PDFs with 5 pages or fewer.");
+      if (pdf.numPages > 10) {
+        setError("This demo supports PDFs with 10 pages or fewer.");
         setStatus("idle");
         return;
       }
@@ -48,8 +43,7 @@ export default function PdfUploader({ onTextExtracted, disabled }: PdfUploaderPr
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
         const pageText = content.items
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((item: any) => ("str" in item ? item.str : ""))
+          .map((item) => ("str" in item ? (item as { str: string }).str : ""))
           .join(" ");
         fullText += pageText + "\n\n";
       }
@@ -129,7 +123,7 @@ export default function PdfUploader({ onTextExtracted, disabled }: PdfUploaderPr
         ) : (
           <>
             <p className="text-gray-700 font-medium">PDF를 드래그하거나 클릭하여 업로드</p>
-            <p className="text-gray-400 text-sm mt-1">최대 5페이지</p>
+            <p className="text-gray-400 text-sm mt-1">최대 10페이지</p>
           </>
         )}
       </div>
