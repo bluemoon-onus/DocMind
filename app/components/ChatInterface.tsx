@@ -16,6 +16,7 @@ interface Message {
   content: string;
   sources?: Source[];
   streaming?: boolean;
+  responseTime?: number;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -31,7 +32,7 @@ interface ChatInterfaceProps {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-2 text-[10px]">
+    <div className="flex justify-between gap-2 text-[20px]">
       <span className="text-gray-400 shrink-0">{label}</span>
       <span className="text-gray-600 text-right font-mono truncate">{value}</span>
     </div>
@@ -89,7 +90,7 @@ function StepSummary({ stepKey, detail, t }: { stepKey: string; detail: any; t: 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">{title}</p>
+      <p className="text-[20px] font-semibold text-gray-500 uppercase tracking-wide mb-1">{title}</p>
       <div className="space-y-0.5">{children}</div>
     </div>
   );
@@ -97,7 +98,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function KV({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-3 text-[10px]">
+    <div className="flex justify-between gap-3 text-[20px]">
       <span className="text-gray-400 shrink-0">{label}</span>
       <span className="text-gray-600 text-right font-mono break-all">{value}</span>
     </div>
@@ -124,8 +125,8 @@ function ExpandedDetail({ stepKey, detail, t }: { stepKey: string; detail: any; 
             <KV label={t("lblVectorNorm")} value={`${out.vectorNorm ?? "-"}`} />
             {out.vectorSample && (
               <div>
-                <p className="text-[10px] text-gray-400 mb-1">{t("lblVectorSample")}</p>
-                <pre className="text-[9px] text-gray-500 font-mono bg-gray-100 rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all">
+                <p className="text-[20px] text-gray-400 mb-1">{t("lblVectorSample")}</p>
+                <pre className="text-[18px] text-gray-500 font-mono bg-gray-100 rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all">
                   [{(out.vectorSample as number[]).map((v: number) => v.toFixed(6)).join(", ")}]
                 </pre>
               </div>
@@ -171,7 +172,7 @@ function ExpandedDetail({ stepKey, detail, t }: { stepKey: string; detail: any; 
                   />
                 ))}
               </div>
-              <p className="text-[9px] text-gray-400 mt-0.5">{t("lblGreenAbove")}</p>
+              <p className="text-[18px] text-gray-400 mt-0.5">{t("lblGreenAbove")}</p>
             </Section>
           )}
         </div>
@@ -187,7 +188,7 @@ function ExpandedDetail({ stepKey, detail, t }: { stepKey: string; detail: any; 
           </Section>
           {out.chunks && (out.chunks as any[]).map((c: any) => (
             <Section key={c.index} title={`#${c.index} — ${c.chars.toLocaleString()}${t("unitChars")} (${c.score})`}>
-              <pre className="text-[9px] text-gray-500 font-mono bg-gray-100 rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed max-h-24 overflow-y-auto">
+              <pre className="text-[18px] text-gray-500 font-mono bg-gray-100 rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed max-h-24 overflow-y-auto">
                 {c.preview ?? ""}…
               </pre>
             </Section>
@@ -206,14 +207,14 @@ function ExpandedDetail({ stepKey, detail, t }: { stepKey: string; detail: any; 
           </Section>
           {inp.systemPromptPreview && (
             <Section title={t("lblSystemPrompt")}>
-              <pre className="text-[9px] text-gray-500 font-mono bg-gray-100 rounded p-1.5 whitespace-pre-wrap break-all leading-relaxed max-h-20 overflow-y-auto">
+              <pre className="text-[18px] text-gray-500 font-mono bg-gray-100 rounded p-1.5 whitespace-pre-wrap break-all leading-relaxed max-h-20 overflow-y-auto">
                 {inp.systemPromptPreview}
               </pre>
             </Section>
           )}
           {inp.userPromptPreview && (
             <Section title={t("lblUserPromptPreview")}>
-              <pre className="text-[9px] text-gray-500 font-mono bg-gray-100 rounded p-1.5 whitespace-pre-wrap break-all leading-relaxed max-h-28 overflow-y-auto">
+              <pre className="text-[18px] text-gray-500 font-mono bg-gray-100 rounded p-1.5 whitespace-pre-wrap break-all leading-relaxed max-h-28 overflow-y-auto">
                 {inp.userPromptPreview}…
               </pre>
             </Section>
@@ -281,7 +282,7 @@ function QueryProcessing({ currentStep, details, t }: { currentStep: string; det
                 onClick={() => isClickable && toggleStep(step.key)}
               >
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] flex-shrink-0 border mt-0.5 ${
+                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[20px] flex-shrink-0 border mt-0.5 ${
                     isDone
                       ? "bg-green-100 border-green-300 text-green-600"
                       : isActive
@@ -305,7 +306,7 @@ function QueryProcessing({ currentStep, details, t }: { currentStep: string; det
                       {step.label}
                     </span>
                     {isClickable && (
-                      <span className={`text-[9px] ${isExpanded ? "text-blue-500" : "text-gray-300"}`}>
+                      <span className={`text-[18px] ${isExpanded ? "text-blue-500" : "text-gray-300"}`}>
                         {isExpanded ? "▼" : "▶"}
                       </span>
                     )}
@@ -446,6 +447,11 @@ export default function ChatInterface({
                 {msg.role === "assistant" && !msg.streaming && msg.sources && (
                   <SourceViewer sources={msg.sources} />
                 )}
+                {msg.role === "assistant" && !msg.streaming && msg.responseTime != null && (
+                  <div className="text-xs text-gray-400 mt-2 text-right font-mono">
+                    [{t("responseComplete")} : {msg.responseTime.toFixed(1)}{t("responseUnit")}]
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -463,10 +469,8 @@ export default function ChatInterface({
       </div>
 
       {queryStep && (
-        <div className="flex-shrink-0 hidden sm:block">
-          <div className="sticky top-6">
-            <QueryProcessing currentStep={queryStep} details={queryStepDetails} t={t} />
-          </div>
+        <div className="fixed right-4 top-24 hidden sm:block z-50">
+          <QueryProcessing currentStep={queryStep} details={queryStepDetails} t={t} />
         </div>
       )}
     </div>

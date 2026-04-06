@@ -206,6 +206,7 @@ export default function Home() {
       return;
     }
     queryingRef.current = true;
+    const queryStartTime = Date.now();
 
     const userMsg: Message = {
       id: `u-${Date.now()}`,
@@ -372,9 +373,10 @@ export default function Home() {
         }
       }
 
+      const responseTime = (Date.now() - queryStartTime) / 1000;
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId ? { ...m, content, sources, streaming: false } : m
+          m.id === assistantId ? { ...m, content, sources, streaming: false, responseTime } : m
         )
       );
       setQueryStep("done");
@@ -402,7 +404,7 @@ export default function Home() {
   return (
     <main className="min-h-screen py-10 px-4">
       {/* Header */}
-      <div className="max-w-4xl mx-auto mb-8">
+      <div className="max-w-6xl mx-auto mb-8">
         <div className="bg-[#1a365d] rounded-2xl px-8 py-6 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -417,7 +419,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
             {pipelineStep > 0 ? t("uploadTitleAnother") : t("uploadTitle")}

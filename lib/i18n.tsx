@@ -109,6 +109,10 @@ const translations = {
   srcMore: { ko: " 더보기", en: " Show more" },
   srcLess: { ko: " 접기", en: " Show less" },
 
+  // ── Response time ──
+  responseComplete: { ko: "응답완료", en: "Response Complete" },
+  responseUnit: { ko: "초", en: "s" },
+
   // ── Misc ──
   errDataExpired: { ko: "문서 데이터가 만료되었습니다. PDF를 다시 업로드해 주세요.", en: "Document data expired. Please re-upload your file." },
   errNoContext: { ko: "관련 컨텍스트를 찾지 못했습니다. 질문을 다르게 해 보세요.", en: "No relevant context found. Try rephrasing your question." },
