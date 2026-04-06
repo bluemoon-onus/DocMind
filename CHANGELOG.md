@@ -3,6 +3,8 @@
 ## 2026-04-06
 
 ### Features
+- Scale all UI font sizes to 1.5× for better readability via Tailwind v4 @theme overrides, widen container to max-w-5xl (`c00e4e4`)
+- Show expanded step details panel to the right of processing panel using absolute positioning (`16d29fe`)
 - Locale-aware question examples and answer language — generate example questions and answers in Korean or English based on current locale setting (`d1ce4fb`)
 - Locale toggle switch UI — replace language button with sliding toggle (한국어/EN) and update sample files (`c99a9be`)
 - Major UX & architecture improvements (`e0a28b8`)
