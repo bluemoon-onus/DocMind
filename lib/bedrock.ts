@@ -4,6 +4,8 @@ import {
   InvokeModelWithResponseStreamCommand,
   type InvokeModelCommandOutput,
 } from "@aws-sdk/client-bedrock-runtime";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
+import https from "node:https";
 
 const client = new BedrockRuntimeClient({
   region: (process.env.AWS_REGION ?? "us-east-1").trim(),
@@ -11,6 +13,14 @@ const client = new BedrockRuntimeClient({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
   },
+  requestHandler: new NodeHttpHandler({
+    httpsAgent: new https.Agent({
+      maxSockets: 10,
+      keepAlive: true,
+    }),
+    requestTimeout: 30_000,
+    connectionTimeout: 5_000,
+  }),
 });
 
 export async function embedText(text: string): Promise<number[]> {
@@ -29,16 +39,42 @@ export async function embedText(text: string): Promise<number[]> {
   return body.embedding as number[];
 }
 
+async function embedTextWithRetry(
+  text: string,
+  retries = 3
+): Promise<number[]> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await embedText(text);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : String(err);
+      const isRetryable =
+        message.includes("NGHTTP2") ||
+        message.includes("ECONNRESET") ||
+        message.includes("socket hang up") ||
+        message.includes("ThrottlingException");
+      if (!isRetryable || attempt === retries - 1) throw err;
+      // Exponential backoff: 1s, 2s, 4s
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+    }
+  }
+  throw new Error("embedTextWithRetry: unreachable");
+}
+
 export async function embedTexts(
   texts: string[],
   onProgress?: (completed: number, total: number) => void
 ): Promise<number[][]> {
   const results: number[][] = new Array(texts.length);
   let completed = 0;
+  const BATCH_SIZE = 2;
 
-  for (let i = 0; i < texts.length; i += 5) {
-    const batch = texts.slice(i, i + 5);
-    const batchResults = await Promise.all(batch.map((text) => embedText(text)));
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const batch = texts.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map((text) => embedTextWithRetry(text))
+    );
     for (let j = 0; j < batchResults.length; j++) {
       results[i + j] = batchResults[j];
       completed++;
