@@ -260,7 +260,7 @@ function QueryProcessing({ currentStep, details, t }: { currentStep: string; det
   }
 
   return (
-    <div className="flex gap-3">
+    <div className="relative">
       <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-2 w-52 shrink-0">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
           {allDone ? t("procCompleted") : t("procProcessing")}
@@ -324,7 +324,7 @@ function QueryProcessing({ currentStep, details, t }: { currentStep: string; det
       </div>
 
       {expandedStep && details[expandedStep] && (
-        <div className="bg-white rounded-xl border border-blue-200 p-4 w-64 shrink-0 overflow-y-auto max-h-[600px] shadow-sm">
+        <div className="absolute left-full top-0 ml-3 bg-white rounded-xl border border-blue-200 p-4 w-72 overflow-y-auto max-h-[600px] shadow-lg z-50">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
               {QUERY_STEPS.find((s) => s.key === expandedStep)?.label}
