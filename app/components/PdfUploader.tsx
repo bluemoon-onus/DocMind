@@ -135,14 +135,15 @@ export default function PdfUploader({ onTextExtracted, disabled }: PdfUploaderPr
     }
   }
 
-  async function loadSamplePdf(filename: string) {
+  async function loadSampleFile(filename: string) {
     setError(null);
     setStatus("uploading");
     try {
       const response = await fetch(`/samples/${filename}`);
       const blob = await response.blob();
-      const file = new File([blob], filename, { type: "application/pdf" });
-      await processPdf(file);
+      const type = filename.endsWith(".txt") ? "text/plain" : "application/pdf";
+      const file = new File([blob], filename, { type });
+      await processFile(file);
     } catch {
       setError(t("errSampleLoad"));
       setStatus("idle");
@@ -207,18 +208,18 @@ export default function PdfUploader({ onTextExtracted, disabled }: PdfUploaderPr
 
       <div className="flex flex-col sm:flex-row gap-3">
         <button
-          onClick={() => loadSamplePdf("NovaTech_X100_Installation_Guide.pdf")}
+          onClick={() => loadSampleFile("NovaTech_X100_Installation_Guide.pdf")}
           disabled={disabled || isLoading}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-400 text-blue-800 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {t("sampleX100")}
         </button>
         <button
-          onClick={() => loadSamplePdf("NovaTech_G500_Gateway_Manual.pdf")}
+          onClick={() => loadSampleFile("About AWS Bedrock.txt")}
           disabled={disabled || isLoading}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-400 text-blue-800 text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t("sampleG500")}
+          {t("sampleBedrock")}
         </button>
       </div>
     </div>

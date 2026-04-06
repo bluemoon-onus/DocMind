@@ -19,12 +19,33 @@ interface StepDetails {
 
 function LocaleToggle() {
   const { locale, setLocale } = useI18n();
+  const isEn = locale === "en";
   return (
     <button
-      onClick={() => setLocale(locale === "ko" ? "en" : "ko")}
-      className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-sm font-medium transition-colors"
+      role="switch"
+      aria-checked={isEn}
+      onClick={() => setLocale(isEn ? "ko" : "en")}
+      className="relative flex items-center w-[88px] h-8 rounded-full bg-white/15 hover:bg-white/25 transition-colors cursor-pointer select-none"
     >
-      {locale === "ko" ? "EN" : "한국어"}
+      <span
+        className={`absolute z-10 w-[42px] h-6 rounded-full bg-white/90 shadow transition-transform duration-200 ${
+          isEn ? "translate-x-[43px]" : "translate-x-[3px]"
+        }`}
+      />
+      <span
+        className={`relative z-20 flex-1 text-center text-xs font-semibold transition-colors duration-200 ${
+          !isEn ? "text-slate-800" : "text-white/70"
+        }`}
+      >
+        한국어
+      </span>
+      <span
+        className={`relative z-20 flex-1 text-center text-xs font-semibold transition-colors duration-200 ${
+          isEn ? "text-slate-800" : "text-white/70"
+        }`}
+      >
+        EN
+      </span>
     </button>
   );
 }

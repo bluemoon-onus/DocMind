@@ -17,7 +17,7 @@ const translations = {
   loadingFile: { ko: "파일 로드 중...", en: "Loading file..." },
   extractingText: { ko: "텍스트 추출 중...", en: "Extracting text..." },
   sampleX100: { ko: "📄 체험: X100 센서 매뉴얼", en: "📄 Try: X100 Sensor Manual" },
-  sampleG500: { ko: "📄 체험: G500 게이트웨이 매뉴얼", en: "📄 Try: G500 Gateway Manual" },
+  sampleBedrock: { ko: "📄 체험: AWS Bedrock 소개", en: "📄 Try: About AWS Bedrock" },
   errOnlyPdfTxt: { ko: "PDF 또는 TXT 파일만 업로드 가능합니다.", en: "Only PDF or TXT files are supported." },
   errPdfSize: { ko: (size: string) => `PDF 파일 크기가 2MB를 초과합니다. (${size})`, en: (size: string) => `PDF file exceeds 2MB limit. (${size})` },
   errTxtSize: { ko: (size: string) => `TXT 파일 크기가 500KB를 초과합니다. (${size})`, en: (size: string) => `TXT file exceeds 500KB limit. (${size})` },
