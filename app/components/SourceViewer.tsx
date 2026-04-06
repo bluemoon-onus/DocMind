@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n";
 
 interface Source {
   text: string;
@@ -13,10 +14,14 @@ interface SourceViewerProps {
 }
 
 export default function SourceViewer({ sources }: SourceViewerProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
   if (sources.length === 0) return null;
+
+  const srcFn = t("srcSources") as (n: number) => string;
+  const chunkFn = t("srcChunk") as (n: number) => string;
 
   return (
     <div className="mt-2">
@@ -25,7 +30,7 @@ export default function SourceViewer({ sources }: SourceViewerProps) {
         className="text-sm text-blue-700 hover:text-orange-500 font-medium flex items-center gap-1 transition-colors"
       >
         <span>{open ? "▾" : "▸"}</span>
-        <span>📎 Sources ({sources.length} chunks found)</span>
+        <span>{srcFn(sources.length)}</span>
       </button>
 
       {open && (
@@ -41,11 +46,10 @@ export default function SourceViewer({ sources }: SourceViewerProps) {
                 className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm"
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-medium text-gray-600">Chunk {source.index + 1}</span>
+                  <span className="font-medium text-gray-600">{chunkFn(source.index + 1)}</span>
                   <span className="text-orange-600 font-mono text-xs">{pct}%</span>
                 </div>
 
-                {/* Similarity bar */}
                 <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
                   <div
                     className="bg-orange-400 h-1.5 rounded-full transition-all"
@@ -62,7 +66,7 @@ export default function SourceViewer({ sources }: SourceViewerProps) {
                         onClick={() => setExpanded((v) => ({ ...v, [i]: !v[i] }))}
                         className="ml-1 text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        {isExpanded ? " 접기" : " 더보기"}
+                        {isExpanded ? t("srcLess") : t("srcMore")}
                       </button>
                     </>
                   )}

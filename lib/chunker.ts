@@ -54,7 +54,7 @@ function splitToFitTokens(text: string, maxTokens: number): string[] {
 
 export function chunkText(text: string): Chunk[] {
   const MAX_TOKENS = 500;
-  const OVERLAP_TOKENS = 50;
+  const OVERLAP_TOKENS = 100;
 
   // Split by double newline (paragraph)
   const paragraphs = text.split(/\n\n+/).filter((p) => p.trim());

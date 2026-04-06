@@ -2,6 +2,7 @@ import {
   BedrockRuntimeClient,
   InvokeModelCommand,
   InvokeModelWithResponseStreamCommand,
+  type InvokeModelCommandOutput,
 } from "@aws-sdk/client-bedrock-runtime";
 
 const client = new BedrockRuntimeClient({
@@ -48,6 +49,33 @@ export async function embedTexts(
   return results;
 }
 
+export async function generateQuestions(chunks: string[]): Promise<string[]> {
+  const sample = chunks.slice(0, 5).join("\n\n");
+  const command = new InvokeModelCommand({
+    modelId: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    contentType: "application/json",
+    accept: "application/json",
+    body: JSON.stringify({
+      anthropic_version: "bedrock-2023-05-31",
+      max_tokens: 256,
+      system:
+        "You generate example questions a user might ask about a document. Return ONLY a JSON array of exactly 3 short questions in the document's language. No explanation, no markdown — just the JSON array.",
+      messages: [
+        {
+          role: "user",
+          content: `Based on this document content, generate 3 example questions:\n\n${sample}`,
+        },
+      ],
+    }),
+  });
+
+  const response: InvokeModelCommandOutput = await client.send(command);
+  const body = JSON.parse(new TextDecoder().decode(response.body));
+  const text = body.content?.[0]?.text ?? "[]";
+  const match = text.match(/\[[\s\S]*\]/);
+  return match ? JSON.parse(match[0]) : [];
+}
+
 export async function* generateAnswer(
   question: string,
   contexts: string[]
@@ -57,7 +85,7 @@ export async function* generateAnswer(
     .join("\n\n");
 
   const command = new InvokeModelWithResponseStreamCommand({
-    modelId: "anthropic.claude-3-5-haiku-20241022-v1:0",
+    modelId: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
     contentType: "application/json",
     accept: "application/json",
     body: JSON.stringify({

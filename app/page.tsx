@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PdfUploader from "./components/PdfUploader";
 import RagPipeline from "./components/RagPipeline";
 import ChatInterface, { type Message, type Source } from "./components/ChatInterface";
 import { chunkText } from "@/lib/chunker";
+import { cosineSimilarity, searchSimilar } from "@/lib/vectorSearch";
+import { useI18n, type Locale } from "@/lib/i18n";
 
 interface StepDetails {
   characters?: number;
@@ -15,19 +17,47 @@ interface StepDetails {
   dimension?: number;
 }
 
+function LocaleToggle() {
+  const { locale, setLocale } = useI18n();
+  return (
+    <button
+      onClick={() => setLocale(locale === "ko" ? "en" : "ko")}
+      className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-sm font-medium transition-colors"
+    >
+      {locale === "ko" ? "EN" : "한국어"}
+    </button>
+  );
+}
+
 export default function Home() {
+  const { t } = useI18n();
   const [pipelineStep, setPipelineStep] = useState(0);
   const [stepDetails, setStepDetails] = useState<StepDetails>({});
   const [elapsedTime, setElapsedTime] = useState(0);
   const [pipelineError, setPipelineError] = useState<string | undefined>();
   const [isReady, setIsReady] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [exampleQuestions, setExampleQuestions] = useState<string[]>([]);
+  const [queryStep, setQueryStep] = useState<string | null>(null);
+  const [queryStepDetails, setQueryStepDetails] = useState<Record<string, object>>({});
 
   const chunksRef = useRef<string[]>([]);
   const embeddingsRef = useRef<number[][]>([]);
+  const queryingRef = useRef(false);
   const startTimeRef = useRef<number>(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastTextRef = useRef<{ text: string; pageCount: number } | null>(null);
+
+  // 개발 모드: 브라우저 콘솔에서 디버깅 가능
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      (window as any).__docmind = {
+        get chunks() { return chunksRef.current; },
+        get embeddings() { return embeddingsRef.current; },
+        get querying() { return queryingRef.current; },
+      };
+    }
+  }, []);
 
   function startTimer() {
     startTimeRef.current = Date.now();
@@ -51,6 +81,7 @@ export default function Home() {
     setPipelineError(undefined);
     setIsReady(false);
     setMessages([]);
+    setExampleQuestions([]);
     chunksRef.current = [];
     embeddingsRef.current = [];
     if (timerRef.current) clearInterval(timerRef.current);
@@ -61,19 +92,16 @@ export default function Home() {
     resetPipeline();
     startTimer();
 
-    // Step 1: Text Extraction complete
     setPipelineStep(1);
     setStepDetails({ characters: text.length, pages: pageCount });
     await new Promise((r) => setTimeout(r, 300));
 
-    // Step 2: Chunking
     setPipelineStep(2);
     const chunks = chunkText(text);
     chunksRef.current = chunks.map((c) => c.text);
     setStepDetails((d) => ({ ...d, chunks: chunks.length }));
     await new Promise((r) => setTimeout(r, 300));
 
-    // Step 3: Embedding
     setPipelineStep(3);
     setStepDetails((d) => ({
       ...d,
@@ -126,14 +154,23 @@ export default function Home() {
         }
       }
 
-      // Step 4: Indexing
       setPipelineStep(4);
       await new Promise((r) => setTimeout(r, 400));
 
-      // Step 5: Ready
-      setPipelineStep(5);
+      setPipelineStep(6);
       stopTimer();
       setIsReady(true);
+
+      fetch("/api/rag/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chunks: chunksRef.current }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.questions?.length) setExampleQuestions(data.questions);
+        })
+        .catch(() => {});
     } catch (err) {
       stopTimer();
       setPipelineError(err instanceof Error ? err.message : "Unknown error");
@@ -141,6 +178,14 @@ export default function Home() {
   }, []);
 
   const handleSendMessage = useCallback(async (question: string) => {
+    if (queryingRef.current) return;
+    if (!chunksRef.current.length || !embeddingsRef.current.length) {
+      alert(t("errDataExpired"));
+      resetPipeline();
+      return;
+    }
+    queryingRef.current = true;
+
     const userMsg: Message = {
       id: `u-${Date.now()}`,
       role: "user",
@@ -156,19 +201,108 @@ export default function Home() {
     };
 
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setQueryStep("embedding");
+    setQueryStepDetails({});
 
     let sources: Source[] = [];
     let content = "";
 
     try {
+      setQueryStepDetails((prev) => ({
+        ...prev,
+        embedding: {
+          input: {
+            question,
+            charCount: question.length,
+            model: "amazon.titan-embed-text-v2:0",
+            dimension: 1024,
+          },
+        },
+      }));
+
+      const embedRes = await fetch("/api/rag/embed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: question }),
+      });
+      const embedData = await embedRes.json();
+      if (embedData.error) throw new Error(embedData.error);
+      const queryEmbedding: number[] = embedData.embedding;
+
+      setQueryStepDetails((prev) => ({
+        ...prev,
+        embedding: {
+          ...prev.embedding,
+          output: {
+            outputDimension: queryEmbedding.length,
+            vectorSample: queryEmbedding.slice(0, 8).map((v) => +v.toFixed(6)),
+            vectorNorm: +Math.sqrt(queryEmbedding.reduce((s, v) => s + v * v, 0)).toFixed(6),
+          },
+        },
+      }));
+
+      setQueryStep("searching");
+
+      const allScores = embeddingsRef.current
+        .map((emb, idx) => ({ index: idx, score: +cosineSimilarity(queryEmbedding, emb).toFixed(4) }))
+        .sort((a, b) => b.score - a.score);
+
+      const topMatches = searchSimilar(queryEmbedding, embeddingsRef.current);
+
+      setQueryStepDetails((prev) => ({
+        ...prev,
+        searching: {
+          input: {
+            totalChunks: embeddingsRef.current.length,
+            algorithm: "Cosine Similarity",
+            threshold: "N/A (Top-K)",
+            vectorDimension: queryEmbedding.length,
+          },
+          output: {
+            matchesFound: topMatches.length,
+            scores: topMatches.map((m) => ({ chunk: m.index, score: +m.score.toFixed(4) })),
+            allScores: allScores.map((s) => ({ chunk: s.index, score: s.score })),
+            scoreRange: { max: allScores[0]?.score ?? 0, min: allScores[allScores.length - 1]?.score ?? 0 },
+          },
+        },
+      }));
+
+      setQueryStep("retrieving");
+
+      if (topMatches.length === 0) {
+        throw new Error(t("errNoContext"));
+      }
+
+      sources = topMatches.map((m) => ({
+        text: chunksRef.current[m.index],
+        score: m.score,
+        index: m.index,
+      }));
+      const contextTexts = sources.map((s) => s.text);
+      const totalContextChars = contextTexts.reduce((sum, t) => sum + t.length, 0);
+
+      setQueryStepDetails((prev) => ({
+        ...prev,
+        retrieving: {
+          input: { topK: 3, matchCount: topMatches.length },
+          output: {
+            chunks: sources.map((s) => ({
+              index: s.index,
+              chars: s.text.length,
+              score: +s.score.toFixed(4),
+              preview: s.text.slice(0, 150),
+            })),
+            totalChars: totalContextChars,
+          },
+        },
+      }));
+
+      setQueryStep("prompting");
+
       const response = await fetch("/api/rag/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          chunks: chunksRef.current,
-          embeddings: embeddingsRef.current,
-        }),
+        body: JSON.stringify({ question, contexts: contextTexts }),
       });
 
       if (!response.body) throw new Error("No response body");
@@ -189,8 +323,21 @@ export default function Home() {
           if (!line.startsWith("data: ")) continue;
           const json = JSON.parse(line.slice(6));
 
-          if (json.type === "sources") {
-            sources = json.sources;
+          if (json.type === "step") {
+            setQueryStep(json.step);
+            if (json.detail) {
+              setQueryStepDetails((prev) => ({
+                ...prev,
+                [json.step]: { ...(prev[json.step] ?? {}), input: json.detail },
+              }));
+            }
+          } else if (json.type === "step_done") {
+            if (json.detail) {
+              setQueryStepDetails((prev) => ({
+                ...prev,
+                [json.step]: { ...(prev[json.step] ?? {}), output: json.detail },
+              }));
+            }
           } else if (json.type === "token") {
             content += json.token;
             setMessages((prev) =>
@@ -209,17 +356,21 @@ export default function Home() {
           m.id === assistantId ? { ...m, content, sources, streaming: false } : m
         )
       );
+      setQueryStep("done");
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Unknown error";
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, content: `오류: ${errMsg}`, streaming: false }
+            ? { ...m, content: `${t("errPrefix")}${errMsg}`, streaming: false }
             : m
         )
       );
+      setQueryStep("done");
+    } finally {
+      queryingRef.current = false;
     }
-  }, []);
+  }, [t]);
 
   const handleRetry = useCallback(() => {
     if (lastTextRef.current) {
@@ -232,23 +383,23 @@ export default function Home() {
       {/* Header */}
       <div className="max-w-4xl mx-auto mb-8">
         <div className="bg-[#1a365d] rounded-2xl px-8 py-6 text-white">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🧠</span>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">DocMind</h1>
-              <p className="text-blue-200 text-sm mt-0.5">
-                AI Document Assistant · Powered by AWS Bedrock RAG
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🧠</span>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">{t("appTitle")}</h1>
+                <p className="text-blue-200 text-sm mt-0.5">{t("appSubtitle")}</p>
+              </div>
             </div>
+            <LocaleToggle />
           </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Uploader */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            {pipelineStep > 0 ? "다른 PDF 업로드" : "PDF 업로드"}
+            {pipelineStep > 0 ? t("uploadTitleAnother") : t("uploadTitle")}
           </h2>
           <PdfUploader
             onTextExtracted={handleTextExtracted}
@@ -256,7 +407,6 @@ export default function Home() {
           />
         </div>
 
-        {/* Pipeline */}
         {pipelineStep > 0 && (
           <div className="animate-fade-in">
             <RagPipeline
@@ -269,12 +419,14 @@ export default function Home() {
           </div>
         )}
 
-        {/* Chat */}
         {pipelineStep > 0 && (
           <div className="animate-fade-in">
             <ChatInterface
               isReady={isReady}
               messages={messages}
+              exampleQuestions={exampleQuestions}
+              queryStep={queryStep}
+              queryStepDetails={queryStepDetails}
               onSendMessage={handleSendMessage}
             />
           </div>

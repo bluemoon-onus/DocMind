@@ -22,7 +22,6 @@ export function searchSimilar(
   }));
 
   return scores
-    .filter((s) => s.score >= 0.3)
     .sort((a, b) => b.score - a.score)
     .slice(0, topK);
 }
