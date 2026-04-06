@@ -9,9 +9,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { question, contexts } = (await request.json()) as {
+    const { question, contexts, locale } = (await request.json()) as {
       question: string;
       contexts: string[];
+      locale?: string;
     };
 
     if (!question || !contexts?.length) {
@@ -25,7 +26,10 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           // Step: Build prompt with context
-          const systemPrompt = "You are a helpful assistant that answers questions based ONLY on the provided document context. If the answer is not found in the context, say you couldn't find it. Answer in the same language as the question. Be concise but thorough.";
+          const langInstruction = locale === "ko"
+            ? "You MUST answer in Korean (한국어). Even if the user's question contains some English words, always respond in Korean."
+            : "You MUST answer in English. Even if the user's question contains some non-English words, always respond in English.";
+          const systemPrompt = `You are a helpful assistant that answers questions based ONLY on the provided document context. If the answer is not found in the context, say you couldn't find it. Be concise but thorough. ${langInstruction}`;
           const userPrompt = `Context:\n${contexts.map((c, i) => `[Context ${i + 1}]\n${c}`).join("\n\n")}\n\nQuestion: ${question}`;
           controller.enqueue(sseEvent({
             type: "step", step: "prompting",
@@ -56,7 +60,7 @@ export async function POST(request: NextRequest) {
           }));
           let tokenCount = 0;
           let totalChars = 0;
-          for await (const token of generateAnswer(question, contexts)) {
+          for await (const token of generateAnswer(question, contexts, locale)) {
             tokenCount++;
             totalChars += token.length;
             controller.enqueue(sseEvent({ type: "token", token }));

@@ -85,8 +85,9 @@ export async function embedTexts(
   return results;
 }
 
-export async function generateQuestions(chunks: string[]): Promise<string[]> {
+export async function generateQuestions(chunks: string[], locale?: string): Promise<string[]> {
   const sample = chunks.slice(0, 5).join("\n\n");
+  const lang = locale === "en" ? "English" : "Korean (한국어)";
   const command = new InvokeModelCommand({
     modelId: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
     contentType: "application/json",
@@ -95,7 +96,7 @@ export async function generateQuestions(chunks: string[]): Promise<string[]> {
       anthropic_version: "bedrock-2023-05-31",
       max_tokens: 256,
       system:
-        "You generate example questions a user might ask about a document. Return ONLY a JSON array of exactly 3 short questions in the document's language. No explanation, no markdown — just the JSON array.",
+        `You generate example questions a user might ask about a document. Return ONLY a JSON array of exactly 3 short questions in ${lang}. No explanation, no markdown — just the JSON array.`,
       messages: [
         {
           role: "user",
@@ -114,11 +115,16 @@ export async function generateQuestions(chunks: string[]): Promise<string[]> {
 
 export async function* generateAnswer(
   question: string,
-  contexts: string[]
+  contexts: string[],
+  locale?: string
 ): AsyncGenerator<string> {
   const contextText = contexts
     .map((c, i) => `[Context ${i + 1}]\n${c}`)
     .join("\n\n");
+
+  const langInstruction = locale === "ko"
+    ? "You MUST answer in Korean (한국어). Even if the user's question contains some English words, always respond in Korean."
+    : "You MUST answer in English. Even if the user's question contains some non-English words, always respond in English.";
 
   const command = new InvokeModelWithResponseStreamCommand({
     modelId: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -128,7 +134,7 @@ export async function* generateAnswer(
       anthropic_version: "bedrock-2023-05-31",
       max_tokens: 1024,
       system:
-        "You are a helpful assistant that answers questions based ONLY on the provided document context. If the answer is not found in the context, say you couldn't find it. Answer in the same language as the question. Be concise but thorough.",
+        `You are a helpful assistant that answers questions based ONLY on the provided document context. If the answer is not found in the context, say you couldn't find it. Be concise but thorough. ${langInstruction}`,
       messages: [
         {
           role: "user",

@@ -51,7 +51,7 @@ function LocaleToggle() {
 }
 
 export default function Home() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [pipelineStep, setPipelineStep] = useState(0);
   const [stepDetails, setStepDetails] = useState<StepDetails>({});
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -185,7 +185,7 @@ export default function Home() {
       fetch("/api/rag/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chunks: chunksRef.current }),
+        body: JSON.stringify({ chunks: chunksRef.current, locale }),
       })
         .then((res) => res.json())
         .then((data) => {
@@ -196,7 +196,7 @@ export default function Home() {
       stopTimer();
       setPipelineError(err instanceof Error ? err.message : "Unknown error");
     }
-  }, []);
+  }, [locale]);
 
   const handleSendMessage = useCallback(async (question: string) => {
     if (queryingRef.current) return;
@@ -323,7 +323,7 @@ export default function Home() {
       const response = await fetch("/api/rag/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, contexts: contextTexts }),
+        body: JSON.stringify({ question, contexts: contextTexts, locale }),
       });
 
       if (!response.body) throw new Error("No response body");
@@ -391,7 +391,7 @@ export default function Home() {
     } finally {
       queryingRef.current = false;
     }
-  }, [t]);
+  }, [t, locale]);
 
   const handleRetry = useCallback(() => {
     if (lastTextRef.current) {
